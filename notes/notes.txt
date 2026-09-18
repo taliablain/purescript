@@ -1,0 +1,1603 @@
+CHAPTER 2
+
+-- for solving the Euler problem, the book provides this first command, without much explanation of how it is working
+> multiples = filter (\n -> mod n 3 == 0 || mod n 5 == 0) ns
+
+-- filters :type 
+filter :: (a -> Boolean) -> List a -> List a
+-- this means it takes a function that turns a value into Boolean, and it take a list. 
+-- It returns a new list containing only elements where the function returned true. 
+-- So conceptually, keep items that satisfy a condition
+
+\n -> mod n 3 == 0 || mod n 5 == 0
+-- this is a lambda function (anonymous function)
+-- in purescript \n -> ... , \ starts a lambda, n is the parameter, -> separates parameter from body
+-- so this means a function that takes n and returns something
+-- mod n 3 means n % 3, so if it == 0, its divisible by 3
+-- so the whole function means, for the list ns, keep only numbers that are divisible by 3 or 5
+
+Modules
+
+* Every file begins with a module header. A module name consists of one or more capitalized words separated by dots. In
+this case, only a single word is used, but My.First.Module would be an equally valid module name 
+* Modules are imported using their full names, including dots to separate the parts of the module name. Here, we import the 
+Prelude module, which provides mod, ==, and many other common functions. We also import Data.List which provides 
+explicitly-listed range and filter functions. We can either import all functions in a module implicitly, as is done with
+Prelude, or list them explicitly. Guidelines are to only have one module with implicit imports. 
+
+* The compiler will display several warnings about missing type declarations. In general it is considered good practice
+to provide explicit type signatures. In this guide, they are left out for brevity. In the absence of type signatures, the
+PureScript compiler infers types automatically but will remind us to consider adding them. 
+
+Writing a test suite
+
+* To test our code, we'll use the assert library 
+
+Compiling for the Browser
+* Spago can be used to turn our PureScript code into JavaScript suitable for use in the web browser by using the 
+spago bundle command
+* All the code in the src directory and any project dependencies have been compiled to JavaScript. The resulting code
+is bundled as index.js and has also had any unused code removed, a process known as dead code elimination. This index.js
+file can now be included in an HTML document 
+
+HAD PROBLEMS WITH THIS SECTION, REVISIT
+
+Compiling ES Modules
+* Spago can also be used to generate ES modules from PureScript code. This can be useful when using NodeJS, or just when
+developing a larger project which uses ES modules to break code into smaller components 
+* spago build , builds ES modules
+* The generated modules will be placed in the output directory by default. Each purescript module will be compiled to its 
+own ES module, in its own subdirectory.
+
+
+CHAPTER 3 
+
+* files can start with a module declaration and its import list 
+* the Prelude module contains a small set of standard definitions and functions. it re-exports many foundational modules
+  from the purescript-prelude library 
+* import Control.Plus (empty), this imports the Control.Plus module and defines the empty value 
+* imports for modules are listed explicitly in parentheses (except for Prelude, which is typically imported as an open
+  import). This is generally a good practice, as it helps to avoid conflicting imports.
+
+Simple types
+* Purescript defines three built-in types corresponding to JavaScript's primitive types: numbers, strings, and booleans.
+* These are defined in the Prim module, which is implicitly imported by every module.
+* They are called Number, String and Boolean, and you can see them in PSCi by using the ::type command.
+* PureScript defines other built in types: integers, characters, arrays, records and functions.
+* Integers are differentiated from floating point values of type Number by the lack of a decimal point.
+* Character literals are wrapped in single quotes, unlike string literals which use double quotes.
+* Arrays correspond to JavaScript arrays, but unlike in JavaScript, all elements of a PureScript array must have the 
+  same type.
+
+  > :type [1, false]
+Could not match type Int with type Boolean.
+
+* This shows an error from the type checker, which failed to unify (i.e make equal) the last of the two elements 
+
+* Records correspond to JavaScripts objects, and record literals have the same syntax as JavaScript's object literals:
+author = { name: "Phil", interests: ["Functional Programming", "JavaScript"] }
+
+:type author
+{ name :: String
+, interests :: Array String
+}
+
+* This type indicates that the specified object has two fields: a name field with the type String, and an interests field
+  with the type Array String, i.e. an array of strings
+* Fields of records can be accessed using a dot, followed by the label of the field to access:
+> author.name 
+"Phil"
+
+* PureScript's functions correspond to JavaScript's functions. Functions can be defined at the top-level of a file by 
+  specifying arguments before the equals sign:
+
+import Prelude -- bring the (+) operator into scope
+
+add :: Int -> Int -> Int
+add x y = x + y
+
+* Alternatively, functions can be defined inline using a backslash character followed by a space-delimited list of 
+  argument names. To enter a multi-line declaration in PSCi, we can enter "paste mode" using the :paste command. In this 
+  mode, declarations are terminated using the Control-D key sequence:
+
+import Prelude
+:paste
+add :: Int -> Int -> Int 
+add = \ x y -> x + y
+^D
+
+* having defined this function in PSCi, we can apply it to its arguments by separating the two arguments from the 
+  function name by whitespace:
+  add 10 20
+
+Notes on indentation 
+
+* PureScript code is indentation-sensitive, just like Haskell, but unlike JavaScript. This means that the whitespace in 
+  your code is not meaningless, but rather is used to group regions of code, just like curly braces in C-like languages 
+* If a declaration spans multiple lines, any lines except the first must be indented past the indentation level of the 
+  first line. 
+
+add x y z = x +
+  y + z
+
+rather than 
+
+add x y z = x +
+y + z
+
+* In the second case, the PureScript compiler will try to parse two declarations, one for each line. 
+* Generally any declarations defined in the same block should be indented at the same level. For example, in PSCi, 
+  declarations in a let statement must be indented equally. This is valid: 
+
+> :paste
+… x = 1
+… y = 2
+… ^D
+
+but this is not:
+> :paste
+… x = 1
+…  y = 2
+… ^D
+
+* certain purescript keywords introduce a new block of code, in which declarations must be further-indented:
+example x y z =
+  let
+    foo = x * y
+    bar = y * z
+  in
+    foo + bar
+
+Defining our types
+
+* A good first step when tackling a new problem in PureScript is to write out type definitions for any values you will be
+  working with. First, lets define a type for records in our address book:
+
+  type Entry =
+  { firstName :: String
+  , lastName  :: String
+  , address   :: Address
+  }
+
+* This defines a type synonym called Entry - the type Entry is equivalent to the type on the right of the equals symbol:
+  a record type with three fields - firstName, lastName, and address. The two name fields will have the type String, and
+  the address field will have the type Address, defined as follows:
+
+  type Address =
+  { street :: String
+  , city   :: String
+  , state  :: String
+  }
+* Note that records can contain other records
+
+* Now let's define a third type synonym for our address book data structure, which will be represented simply as a 
+  linked list of entries: 
+
+  type AddressBook = List Entry 
+
+* Note that List Entry differs from Array Entry, which represents an array of entries.
+
+Type Constructors and Kinds
+
+* List is an example of a type constructor. Values do not have the type List directly, but rather List a for some type a.
+  That is, List takes a type argument a and constructs a new type List a.
+
+* Note that just like function application, type constructors are applied to other types simply by juxtaposition: the 
+  type List Entry is in fact the type constructor List applied to the type Entry - it represents a list of entries
+
+* If we try to incorrectly define a value of type List (by using the type annotation operator ::), we will see a new 
+  type of error:
+
+  > import Data.List
+  > Nil :: List
+  In a type-annotated expression x :: t, the type t must have kind Type
+
+* This is a kind error. Just like values are distinguished by their types, types are distinguished by their kinds, and 
+  just like ill-typed values result in type errors, ill-kinded types result in kind errors.
+* There is a special kind called Type which represents the kind of all types which have values, like Number and String 
+* There are also kinds for type constructors. for example, the kind Type -> Type represents a function from types to 
+  types, just like List. So the error here ocured because values are expected to have types with kind Type, but List has 
+  kind Type -> Type.
+* to find out the kind of a type, use the :kind command in PSCi:
+
+> :kind Number
+Type
+
+> import Data.List
+> :kind List
+Type -> Type
+
+> :kind List String
+Type
+
+* purescript's kind system supports other interesting kinds, which we will see later in the book.
+
+Quantified Types 
+
+* for illustration purposes, let's define a primitive function that takes any two arguments and returns the first one: 
+
+> :paste
+… constantlyFirst :: forall a b. a -> b -> a
+… constantlyFirst = \a b -> a
+… ^D
+
+* Note that if you use :type to ask about the type of constantlyFirst, it will be more verbose:
+
+: type constantlyFirst
+forall (a :: Type) (b :: Type). a -> b -> a
+The type signature contains additional kind information, which explicitly notes that a and b should be concrete types.
+
+* the keyword forall indicates that constantlyFirst has a universally quantified type. it means we can substitute any
+  types for a and b - constantlyFirst will work with these types. 
+* for example, we might choose the type a to be Int and b to be String. In that case we can specialize the type of 
+  constantlyFirst to Int -> String -> Int 
+* we don't have to indicate in code that we want to specialize a quantified type - it happens automatically. 
+* while we can choose types for a and b, the return type of constantlyFirst has to be the same as the type of the first
+  argument (because both of them are "tied" to the same a)
+
+* A function definition begins with the name of the function, followed by a list of argument names. The result of the 
+  function is specified after the equals sign. Fields are accessed with a dot, followed by the field name. In purescript,
+  string concatenation uses the diamond operator (<>), instead of the plus operator like in javascript. 
+
+Creating Address Books
+
+* We will also need a function for inserting a value into an existing address book. we will call this function 
+  insertEntry. start by giving its type:
+  insertEntry :: Entry -> AddressBook -> AddressBook
+
+* this type signature says that insertEntry takes an Entry as its first argument, an AddressBook as a second argument, 
+  and returns a new AddressBook. 
+* we don't modify the existing AddressBook directly. Instead, we return a new AddressBook, which contains the same data.
+  As such, AddressBook is an example of an immutable data structure. This is an important idea in PureScript - 
+  mutation is a side-effect of code and inhibits our ability to reason effectively about its behaviour, so we prefer 
+  pure functions and immutable data where possible. 
+* to implement insertEntry, we can use the Cons function from Data.List:
+$ spago repl
+
+> import Data.List
+> :type Cons
+
+forall (a :: Type). a -> List a -> List a
+
+* This type signature says that Cons takes a value of some type a, takes a list of elements of type a, and returns a 
+  new list with entries of the same type. let's specialize this with a as our Entry type:
+  Entry -> List Entry -> List Entry
+  But List Entry is the same as AddressBook, so this is equivalent to
+  Entry -> AddressBook -> AddressBook
+* in our case we already have the appropriate inputs: an Entry, and an AddressBook, so can apply Cons and get a new 
+  AddressBook, which is exactly what we wanted. 
+  Here is our implementation of insertEntry:
+  insertEntry entry book = Cons entry book
+* this brings the two arguments entry and book into scope - on the left-hand side of the equals symbol - and then applies 
+  the Cons function to create the result.
+
+Curried Functions 
+
+* Functions in purescript take exactly one argument. While it looks like the insertEntry function takes two arguments, 
+  it is an example of a curried function. In purescript, all functions are considered curried. 
+* currying means converting a function that takes multiple arguments into a function that takes them one at a time. 
+* when we call a function, we pass it one argument, and it returns another function that also takes one argument until all
+  arguments are passed. 
+
+add :: Int -> Int -> Int
+add x y = x + y
+
+addFive :: Int -> Int
+addFive = add 5
+
+* addFive is the result of partial application, which means we pass less than the total number of arguments to a function
+  that takes multiple arguments:
+
+> :paste
+… addFive :: Int -> Int
+… addFive = add 5
+… ^D
+
+> addFive 1
+6
+
+> add 5 1
+6
+
+* to better understand currying and partial application, try making a few other functions, for example, out of add
+
+insertEntry :: Entry -> AddressBook -> AddressBook
+
+* the -> operator in the type signature associates to the right, which means that the compiler parses the type as 
+ Entry -> (AddressBook -> AddressBook)
+
+* insertEntry takes a single argument, an Entry, and returns a new function, which in turn takes a single AddressBook
+  argument and returns a new AddressBook. This means we can partially apply insertEntry by specifying only its first
+  argument for example. 
+
+* function application associates to the left, which explains why we can specfiy function arguments one after the other,
+  separated by whitespace. 
+* the -> operator in function types is a type constructor for functions. It takes two type arguments: the function's
+  argument type and the return type - the left and the right operands, respectively. 
+
+* Now consider the definition of insertEntry:
+
+insertEntry :: Entry -> AddressBook -> AddressBook
+insertEntry entry book = Cons entry book
+
+* If we explicitly parenthesize the right-hand side, we get (Cons entry) book. That is, insertEntry is a function whose 
+  argument is just passed along to the (Cons entry) function. But if two functions have the same result for every input,
+  then they are the same! So we can remove the argument book from both sides:
+
+  insertEntry :: Entry -> AddressBook -> AddressBook
+  insertEntry entry = Cons entry
+
+  But now, by the same argument, we can remove entry from both sides:
+
+  insertEntry :: Entry -> AddressBook -> AddressBook
+  insertEntry = Cons
+
+* this process, called eta conversion, can be used (along with other techniques) to rewrite functions in point-free form, 
+  which means functions defined without reference to their arguments. 
+* in the case of insertEntry, eta conversion has resulted in a very clear defintion of our function - "insertEntry is just
+  cons on lists". However, it is arguable whether the point-free form is better in general. 
+
+Property Accessors 
+
+* One common pattern is to use a function to access individual fields (or "properties") of a record. An inline function 
+  to extract an Address from Entry could be written as:
+  \ entry -> entry.address
+
+* PureScript also allows property accessor shorthand, where an underscore acts as the anonymous function argument, so the
+  inline function above is equivalent to:
+  _.address 
+* This works with any number of levels or properties, so a function to extract the city associated with an Entry could 
+  be written as: 
+  _.address.city 
+
+Querying the Address book
+
+* the last function we need to implement will look up a person by name and return the correct Entry. This will be a nice 
+  application of building programs by composing small functions - a key idea from functional programming. 
+* we can filter the address book, keeping only those entries with the correct first and last names. Then we can return 
+  the head (i.e. first) element of the resulting list. 
+* with this high-level specification of our approach, we can calculate the type of our function.
+
+$ spago repl
+
+> import Data.List
+> :type filter
+
+forall (a :: Type). (a -> Boolean) -> List a -> List a
+
+> :type head
+
+forall (a :: Type). List a -> Maybe a
+
+* let's pick apart these two types to understand their meaning 
+* filter is a curried function of two arguments. Its first argument is a function, which takes an element of the list 
+  and returns a Boolean value. Its second argument is a list of elements, and the return value is another list.
+* head takes a list as its argument and returns a type we haven't seen before: Maybe a. Maybe a represents an optional
+  value of type a, and provides a type-safe alternative to using null to indicate a missing value in languages like 
+  javascript. 
+* the universally quantified types of filter and head can be specialized by the purescript compiler, to the following
+  types:
+  filter :: (Entry -> Boolean) -> AddressBook -> AddressBook
+
+  head :: AddressBook -> Maybe Entry
+
+* we know that we will need to pass the first and last names that we want to search for as arguments to our function 
+* we also know that we will need a function to pass to filter. let's call this function filterEntry. filterEntry will
+  have type Entry -> Boolean. The application filter filterEntry will then have type AddressBook -> AddressBook. If we 
+  pass this result of this function to the head function, we get our result of type Maybe Entry.
+
+findEntry :: String -> String -> AddressBook -> Maybe Entry
+
+* This type signature says that findEntry takes two strings: the first and last names, takes an AddressBook, and returns
+  an optional Entry. The optional result will contain a value only if the name is found in the address book.
+
+findEntry firstName lastName book = head (filter filterEntry book)
+  where
+    filterEntry :: Entry -> Boolean
+    filterEntry entry = entry.firstName == firstName && entry.lastName == lastName
+
+* findEntry brings three names into scope: firstName and lastName, both representing strings, and book, an AddressBook 
+* the right hand side of the definition combines the filter and head functions, first the list of entries is filtered,
+  and the head function is applied to the result. 
+* the predicate function filterEntry is defined as an auxiliary declaration inside a where clause. this way, the 
+  filterEntry function is available inside the definiton of our function, but not outside it. also, it can depend on 
+  the arguments to the enclosing function, which is essential here because filterEntry uses the firstName and lastName 
+  arguments to filter the specified entry. 
+* note that, just like for top-level declarations, it was unnecessary to specify a type signature for filterEntry. 
+  however, doing so is recommended as a form of documentation.
+
+Infix Function application
+
+* most functions discussed so far used prefix function application, where the function name was put before the arguments.
+* however, this chapter has also included examples of infix binary operators, such as the == operator in the definition 
+  of filterEntry, where the operator is put between the two arguments. These infix operators are defined in the 
+  purescript source as infix aliases for their underlying prefix implementations. 
+* for example, == is defined as an infix alias for the prefix eq function with the line:
+  infix 4 eq as ==
+* therefore entry.firstName == firstName in filterEntry could be replaced with the eq entry.firstName firstName
+* in some situations, putting a prefix function in an infix position as an operator leads to more readable code:
+> mod 8 3
+2
+* the above usage works fine but is awkward to read. a more familiar phrasing is eight mod three which you can 
+  achieve by wrapping a prefix function in backticks:
+> 8 `mod` 3
+2
+* In the same way, wrapping insertEntry in backticks turns it into an infix operator, such that book1 and
+  book2 below are equivalent:
+book1 = insertEntry john emptyBook
+book2 = john `insertEntry` emptyBook
+* We can make an AddressBook with multiple entries by using multiple applications of insertEntry as a prefix 
+  function (book3) or as an infix operator (book4) as shown below:
+book3 = insertEntry john (insertEntry peggy (insertEntry ned emptyBook))
+book4 = john `insertEntry` (peggy `insertEntry` (ned `insertEntry` emptyBook))
+* We can also define an infix operator alias (or synonym) for insertEntry. We’ll arbitrarily choose ++ for this
+  operator, give it a precedence of 5, and make it right associative using infixr:
+infixr 5 insertEntry as ++
+* This new operator lets us rewrite the above book4 example as:
+book5 = john ++ (peggy ++ (ned ++ emptyBook))
+* The right associativity of our new ++ operator lets us get rid of the parentheses without changing the meaning:
+book6 = john ++ peggy ++ ned ++ emptyBook
+* another common technique for eliminating parens is to use apply's infix operator $ , along with your standard 
+  prefix functions. 
+* for example, the earlier book 3 example could be rewritten as:
+book7 = insertEntry john $ insertEntry peggy $ insertEntry ned emptyBook
+* Substituting $ for parens is usually easier to type and (arguably) easier to read. A mnemonic to remember the
+  meaning of this symbol is to think of the dollar sign as being drawn from two parens that are also being
+  crossed-out, suggesting the parens are now unnecessary.
+* note that $ isn't a special syntax hardcoded into the language. it's simply rhe infix operator for a regular function 
+  called apply, which is defined in Data.Function as follows:
+apply :: forall a b. (a -> b) -> a -> b
+apply f x = f x
+
+infixr 0 apply as $
+
+* the apply function takes another function (of type a -> b) as its first argument and a value (of type a ) as it's
+  second argument, then calls that function with that value. if it seems like this function doesn't contribute anything
+  meaningful, you are absolutely correct. your program is logically identical without it (see referential transparency).
+* The syntactic utility of this function comes from the special properties assigned to its infix operator. 
+* $ is a right-associative (infixr), low precedence (0) operator, which lets us remove sets of parentheses for
+  deeply-nested applications.
+* Another parens-busting opportunity for the $ operator is in our earlier findEntry function:
+findEntry firstName lastName book = head $ filter filterEntry book
+* we'll see an even more elegant way to rewrite this line with "function composition" in the next section 
+
+* If you’d like to use a concise infix operator alias as a prefix function, you can surround it in parentheses:
+> 8 + 3
+11
+
+> (+) 8 3
+11
+
+* Alternatively, operators can be partially applied by surrounding the expression with parentheses and using
+  _ as an operand in an operator section. You can think of this as a more convenient way to create simple anonymous
+ functions (although in the below example, we’re then binding that anonymous function to a name, so it’s not so
+ anonymous anymore):
+
+> add3 = (3 + _)
+> add3 2
+5
+
+* to summarize, the following are equivalent definitions of a function that adds 5 to its argument:
+add5 x = 5 + x
+add5 x = add 5 x
+add5 x = (+) 5 x
+add5 x = 5 `add` x
+add5   = add 5
+add5   = \x -> 5 + x
+add5   = (5 + _)
+add5 x = 5 `(+)` x  -- Yo Dawg, I herd you like infix, so we put infix in your infix!
+
+Function composition 
+
+* just like we were able to simplify the insertEntry function by using eta conversion, we can simplify the definiton 
+  of findEntry by reasoning about its arguments. 
+findEntry firstName lastName book = head $ filter filterEntry book
+* Note that the book argument is passed to the filter filterEntry function, and the result of this application is 
+  passed to head. In other words, book is passed to the composition of the functions filter filterEntry and head. 
+* in purescript, the function composition operators are <<< and >>> . the first is "backwards composition", and the 
+  second is "forwards composition" 
+* we can rewrite the right-hand side of findEntry using either operator. using backwards composition, the right-hand 
+  side would be:
+(head <<< filter filterEntry) book
+* in this form, we can apply the eta conversion trick from earlier, to arrive at the final form of findEntry:
+findEntry firstName lastName = head <<< filter filterEntry
+  where
+    ...
+* an equally valid right-hand side would be:
+filter filterEntry >>> head
+* either way, this gives a clear definition of the findEntry function: "findEntry is the composition of a filtering 
+  funcion and the head function"
+* I will let you decide which definition is easier to understand, but it is often useful to think of functions as 
+  building blocks in this way: each function executes a single task, and solutions are assembled using function 
+  composition. 
+
+
+Test your understanding of the findEntry function by writing down the types of each of its major subexpressions.
+ For example, the type of the head function as used is specialized to AddressBook -> Maybe Entry.
+
+
+
+Address -> String 
+ showAddress addr = addr.street <> ", " <>
+                   addr.city <> ", " <>
+                   addr.state
+
+Entry -> String -> Address 
+showEntry entry = entry.lastName <> ", " <>
+                  entry.firstName <> ": " <>
+                  showAddress entry.address
+
+
+
+class Cons (label :: Symbol) (a :: k) (tail :: Row k) (row :: Row k) | label a tail -> row, label row -> a tail
+
+Entry -> List Entry -> List Entry
+insertEntry = Cons
+
+findEntry :: String -> String -> AddressBook -> Maybe Entry
+ findEntry firstName lastName = head <<< filter filterEntry
+  where
+  filterEntry :: Entry -> Boolean
+  filterEntry entry = entry.firstName == firstName && entry.lastName == lastName                 
+
+
+CHAPTER 4 - Pattern Matching
+
+* this chapter will introduce two new concepts: algebraic data types and pattern matching. we will also briefly cover an interesting feature of the purescript 
+  type system: row polymorphism. 
+* pattern matching is a common technique in functional programming and allows the developer to write compact functions, which express potentially complex ideas 
+  by breaking their implementation down into multiple cases.
+* algebraic data types are a feature of the purescript type system, which enables a similar level of expressiveness in the language of types - they are closely 
+  related to pattern matching. 
+* this chapter's goal will be to write a library to describe and manipulate simple vector graphics using algebraic types and pattern matching
+
+Project setup 
+
+* the Data.Picture module defines a data type Shape for simple shapes and a type Picture for collections of shapes, along with functions for working with those 
+  types 
+* the module imports the Data.Foldable module, which provides functions for folding data structures:
+
+module Data.Picture where
+
+import Prelude
+import Data.Foldable (foldl)
+import Data.Number (infinity)
+
+* The Data.Picture module also imports the Number module, but this time using the as keyword:
+
+import Data.Number as Number 
+
+* this makes the types and functions in that module available for use, but only by using the qualified name, like Number.max. This an be useful to avoid 
+  overlapping imports or clarify which modules certain things are imported from. 
+* Note: Using the same module name as the original module for a qualified import is unnecessary – shorter qualified names like import Data.Number as N 
+  are possible and quite common.
+
+Simple pattern matching 
+
+* let's begin by looking at an example. here is a function that computes the greatest common divisor of two integers using pattern matching: 
+
+gcd :: Int -> Int -> Int
+gcd n 0 = n
+gcd 0 m = m
+gcd n m = if n > m
+            then gcd (n - m) m
+            else gcd n (m - n)
+
+* this algorithm is called the Euclidean Algorithm. if you search for its definition online, you will likely find a set of mathematical equations that look
+  like the code above.
+* one benefit of pattern matching is that it allows you to define code by cases, writing simple declarative code that looks like a mathematical function 
+  equation.
+* a function written using pattern matching works by pairing sets of conditions with their results. each line is called an alternative or a case.
+* the expressions on the left of the equals sign are called patterns, and each consists of one or more patterns separated by spaces 
+* cases describe which conditions the arguments must satisfy before the expression on the right of the equals sign should be evaluated and returned.
+* each case is tried in order, and the first case whose patterns match their inputs determines the return value 
+* for example the gcd function is evaluated using the following steps:
+  * the first case is tried: if the second argument is zero, the function returns n (the first arg)
+  * if not, the second case is tried: if the first argument is zero, the function returns m (the second argument)
+  * otherwise, the function evalautes and returns the expression in the last line 
+* Note that patterns can bind values to names - each line in the example binds one or both of the names n and m to the input values. as we learn about different 
+  patterns, we will see that patterns correspond to different ways to choose names from the input arguments.
+
+Simple patterns 
+
+* the example code above demonstrates two types of patterns:
+  * integer literals patterns, which match something of type Int, only if the value matches exactly.
+  * variable patterns, which bind their argument to a name 
+* there are other types of simple patterns:
+  * Number, String, Char, Boolean literals 
+  * wildcard patterns, indicated with an underscore (_), match any argument and do not bind names 
+* here are two more examples that demonstrate using these simple patterns:
+fromString :: String -> Boolean
+fromString "true" = true
+fromString _      = false
+
+toString :: Boolean -> String
+toString true  = "true"
+toString false = "false"
+
+Guards 
+
+* In the Euclidean algorithm example, we used an if ..then ... else expression to switch between the two alternatives when m > n and m <= n. another option,
+  in this case, would be to use a guard. 
+* a guard is a boolean-valued expression that must be satisfied in additon to the constraints imposed by the patterns. here is the Euclidean algorithm rewritten
+  to use a guard:
+
+gcdV2 :: Int -> Int -> Int
+gcdV2 n 0 = n
+gcdV2 0 n = n
+gcdV2 n m | n > m     = gcdV2 (n - m) m
+          | otherwise = gcdV2 n (m - n)
+
+* in this case, the third line uses a guard to impose the extra condition that the first argument is strictly larger than the second. the guard in the final line
+  uses the expression otherwise, which might seem like a keyword but is, in fact, just a regular binding in Prelude:
+
+> :type otherwise
+Boolean
+
+> otherwise
+true
+
+* this example demonstrates that guards appear on the left of the equals symbol, separated from the list of patterns by a type character. 
+
+TODO - finish chapter 4 section 1 exercises 
+
+Array patterns
+
+* Array literal patterns provide a way to match arrays of a fixed length. For example, suppose we want to write a function isEmpty which identifies empty arrays. 
+  we could do this by using an empty array pattern ([]) in the first alternative:
+
+  isEmpty :: forall a. Array a -> Boolean 
+  isEmpty [] = true
+  isEmpty _ = false 
+
+* Here is another function that matches arrays of length five, binding each of its five elements differently:
+
+  takeFive :: Array Int -> Int 
+  takeFive [0, 1, a, b, _] = a * b
+  takeFive _ = 0 
+
+* The first pattern only matches arrays with five elements, whose first and second elements are 0 and 1 respectively. In that case, the function returns the 
+  product of the third and fourth elements. In every other case, the function returns zero. Foe example 
+  
+> :paste
+… takeFive [0, 1, a, b, _] = a * b
+… takeFive _ = 0
+… ^D
+
+> takeFive [0, 1, 2, 3, 4]
+6
+
+> takeFive [1, 2, 3, 4, 5]
+0
+
+> takeFive []
+0
+
+* Array literal patterns allow us to match arrays of a fixed length. Still, purescript does not provide any means of matching arrays of an unspecified length 
+  since destructuring immutable arrays in these sorts of ways can lead to poor performance. if you need a data strcuture that supports this sort of matching, 
+  the recommended approach is to use Data.List. other data structures exist which provide improved asymptotic performance for different operations 
+
+Record patterns and row polymorphism 
+
+* record patterns are used to match - you guessed it - records 
+* record patterns look just like record literals, but instead of values on the right of the colon, we specify a binder for each field 
+* for example, this pattern matches any record which contains fields called first and last, and binds their values to the names x and
+  y, respectively:
+
+showPerson :: { first :: String, last :: String } -> String
+showPerson { first: x, last: y } = y <> ", " <> x
+
+* Record patterns provide a good example of an interesting feature of the purescript type system: row polymorphism. suppose we had defined 
+  showPerson without a type signature above. what would its inferred type have been? interestingly it is not the same type as the type
+  we gave:
+
+> showPerson { first: x, last: y } = y <> ", " <> x
+
+> :type showPerson
+forall (r :: Row Type). { first :: String, last :: String | r } -> String
+
+* what is the type variable r here? well, if we try showPerson in PSCi, we see something interesting:
+
+> showPerson { first: "Phil", last: "Freeman" }
+"Freeman, Phil"
+
+> showPerson { first: "Phil", last: "Freeman", location: "Los Angeles" }
+"Freeman, Phil"
+
+* we an append additional fields to the record, and the showPerson function will still work. as long as the record contains the first and
+  last fields of type String, the function application is well-types. however, it is not valid to call showPerson with too few fields:
+
+> showPerson { first: "Phil" }
+
+Type of expression lacks required label "last"
+
+* we can read the new type signature of showPerson as "takes any record with first and last fields which are Strings and any other fields,
+  and returns a String". this function is polymorphic in the row r of record fields, hence the name row polymorphism. Note that this 
+  behaviour is different than that of the original showPerson. without the row variable r, showPerson only accepts records with exactly 
+  a first and last field and no others.
+* note that we could have also written:
+> showPerson p = p.last <> ", " <> p.first 
+
+* and PSCi would have inferred the same type 
+
+Record Puns 
+
+* Recall that the showPerson function matches a record inside its argument, binding the first and last fields to values named x and y. 
+  we could alternatively reuse the field names themselves and simplify this sort of pattern match as follows:
+
+showPersonV2 :: { first :: String, last :: String } -> String
+showPersonV2 { first, last } = last <> ", " <> first
+
+* here, we only specify the names of the fields, and we do not need to specify the names of the values we want to introduce. this is 
+  called a record pun. 
+* it is also possible to use record puns to construct records. for example, if we have values named first and last in scope, we can
+  construct a person record using { first, last}:
+
+unknownPerson :: { first :: String, last :: String }
+unknownPerson = { first, last }
+  where
+    first = "Jane"
+    last  = "Doe"
+* this may improve the readability of code in some circumstances
+
+Nested Patterns 
+
+* Array patterns and record patterns both combine smaller patterns to build larger patterns. for the most part, the examples above 
+  have only used simple patterns inside array patterns and record patterns. still, it is important to note that patterns can be 
+  arbitrarily nested, which allows functions to be defined using conditions on potentially complex data types. 
+* for example, this code combines two record patterns:
+
+type Address = { street :: String, city :: String }
+
+type Person = { name :: String, address :: Address }
+
+livesInLA :: Person -> Boolean
+livesInLA { address: { city: "Los Angeles" } } = true
+livesInLA _ = false
+
+Named Patterns 
+
+* Patterns can be named to bring additional names into scope when using nested patterns. Any pattern can be named by using the @ symbol.
+* For example, this function sorts two-element arrays, naming the two elements, but also naming the array itself:
+
+sortPair :: Array Int -> Array Int
+sortPair arr@[x, y]
+  | x <= y = arr
+  | otherwise = [y, x]
+sortPair arr = arr
+
+* this way, we save ourselves from allocating a new array if the pair is already sorted. note that if the input array does not contain 
+  exactly two elements, then this function returns it unchanged, even if its unsorted. 
+
+Case expressions
+
+* Patterns do not only appear in top-level function declarations. It is possible to use patterns to match on an intermediate value in a 
+  computation using a case expression. 
+* Case expressions provide a similar type of utility to anonymous functions: it is not always desirable to give a name to a function, 
+  and a case expression allows us to avoid naming a function just because we want to use a pattern.
+* Here is an example. This function computes the "longest zero suffix" of an array (the longest suffix which sums to zero)
+
+import Data.Array (tail)
+import Data.Foldable (sum)
+import Data.Maybe (fromMaybe)
+
+lzs :: Array Int -> Array Int
+lzs [] = []
+lzs xs = case sum xs of
+           0 -> xs
+           _ -> lzs (fromMaybe [] $ tail xs)
+
+* this function works by case analysis. if the array is empty, our only option is to return an empty array. if the array is non-empty,
+  we first use a case expression to split it into two cases. If the sum of the array iz zero, we return the whole array. if not, we 
+  recurse on the tail of the array
+* for example:
+> lzs [1, 2, 3, 4]
+[]
+
+> lzs [1, -1, -2, 3]
+[-1, -2, 3]
+* this function works by case analysis. if the array is empty, our only option is to return an empty array. if the array is non-empty, we
+  first use a case expression to split it into two cases. if the sum of the array is zero, we return the whole array. if not, we recurse on
+  the tail of the array
+
+Pattern match failures and partial functions 
+
+* If patterns in a case expression are tried in order, what happens when none of the patterns in a case alternatives match their inputs?
+* In this case, the case expression will fail at runtime with a pattern match failure.
+* we can see this behaviour with a simple example:
+
+import Partial.Unsafe (unsafePartial)
+
+partialFunction :: Boolean -> Boolean
+partialFunction = unsafePartial \true -> true
+
+* this function contains only a single case, which only matches a single input, true. if we compile this file and test in PSCi with any 
+  other argument, we will see an error at runtime;
+
+  > partialFunction false
+
+Failed pattern match
+
+* functions that return a value for any combination of inputs are called total functions, and functions that do not are called partial.
+* it is generally considered better to define total functions where possible. if it is known that a function does not return a result for 
+  some valid set of inputs, it is usually better to return a value capable of indicating failure, such as type Maybe a for some a, using 
+  Nothing when it cannot return a valid result. This way, the presence or absence of a value can be indicated in a type-safe way.
+
+* the PureScript compiler will generate an error if it can detect that your function is not total due to an incomplete pattern match.
+* the unsafePartial function can be used to silence these errors (if you are sure your partial function is safe!) if we removed the call to
+  the unsafePartial function above, then the compiler would generate the following error:
+
+  A case expression could not be determined to cover all inputs.
+The following additional cases are required to cover all inputs:
+
+  false
+
+* this tells us that the value false is not matched by any pattern. In general, these warnings might include multiple unmatched cases.
+* if we also omit the type signature above 
+
+partialFunction true = true
+
+* then PSCi infers a curious type:
+> :type partialFunction
+
+Partial => Boolean -> Boolean
+
+* we will see more types that involve the => symbol later on in the book (they are related to type classes), but for now, it suffices to 
+  observe that PureScript keeps track of partial functions using the type system, and that we must explicitly tell the type checker when 
+  they are safe.
+* the compiler will also generate a warning in certain cases when it can detect that cases are redundant (that is, a case only matches
+  values which a prior case would have matched):
+
+redundantCase :: Boolean -> Boolean
+redundantCase true = true
+redundantCase false = false
+redundantCase false = false
+
+* in this case, the last case is correctly identified as redundant:
+
+A case expression contains unreachable cases:
+
+  false
+
+Algebraic Data Types
+
+* This section will introduce a feature of the PureScript type system called Algebraic Data Types (or ADTs), which are fundamentally 
+  related to pattern matching
+* However, we'll first consider a motivating example, which will provide the basis of a solution to this chapter's problem of
+  implementing a simple vector graphics library. 
+* suppose we wanted to define a type to represent some simple shapes: lines, rectangles, circles, text etc. In an object oriented 
+  language, we would probably define an interface or abstract class Shape, and one concrete subclass for each type of shape that 
+  we wanted to be able to work with. 
+* However, this approach has one major drawback: to work with Shapes abstractly, it is necessary to identify all of the operations 
+  one might wish to perform and to define them on the shape interface. It becomes difficult to add new operations without breaking 
+  modularity.
+* Algebraic data types provide a type-safe way to solve this problem if the set of shapes is known in advance. 
+* it is possible to define new operations on Shape in a modular way and still maintain type-safety
+* here is how Shape might be represented as an algebraic data type:
+
+data Shape
+  = Circle Point Number
+  | Rectangle Point Number Number
+  | Line Point Point
+  | Text Point String
+
+type Point =
+  { x :: Number
+  , y :: Number
+  }
+
+* this declaration defines Shape as a sum of different constructors, and for each constructor identifies the included data. A shape 
+  is either a Circle that contains a center Point and a radius (a number), or a Rectangle, or a Line, or Text. There are no other
+  ways to construct a value of type Shape.
+* an algebraic data type is introduced using the data keyword, followed by the name of the new type and any type arguments. The type's
+  constructors (i.e its data constructors) are defined after the equals symbol and separated by pipe characters (|). The data carried by
+  an ADT's constructors doesn't have to be restricted to primitive types: constructors can include records, arrays, or even other ADTs.
+* Let's see another example from PureScript's standard libraries. we saw the Maybe type, which is used to define optional values, earlier
+  in the book. Here is its definition from the maybe package:
+
+  data Maybe a = Nothing | Just a
+
+* this example demonstrates the use of a type parameter a. reading the pipe character as the word "or", its definition almost reads like 
+  English: "a value of type Maybe a is either Nothing, or Just a value of type a".
+* note that we don't use the syntax forall a . anywhere in our data definition. forall syntax is necessary for functions but is not used 
+  when defining ADTs with data or type aliases with type. 
+
+* Data constructors can also be used to define recursive data structures. here is one more example, defining a data type of singly-linked 
+  lists of elements of type a:
+
+  data List a = Nil | Cons a (List a)
+
+* this example is taken from the lists package. here, the Nil constructor represents an empty list, and Cons is used to create non-empty 
+  lists from a head element and a tail. Notice how the tail is defined using the data type List a, making this a recursive data type. 
+
+Using ADTs
+
+* it is simple enough to use the constructors of an algebraic data type to construct a value: simply apply them like functions, providing 
+  arguments corresponding to the data included with the appropriate constructor. 
+* for example, the Line constructor defined above required two Points, so to construct a Shape using the Line constructor, we have to 
+  provide two arguments of type Point:
+
+exampleLine :: Shape
+exampleLine = Line p1 p2
+  where
+    p1 :: Point
+    p1 = { x: 0.0, y: 0.0 }
+
+    p2 :: Point
+    p2 = { x: 100.0, y: 50.0 }
+
+* so constructing values of algebraic data types is simple, but how do we use them? this is where the important connection with pattern 
+  matching appears: the only way to consume a value of an algebraic data type is to use a pattern to match its constructor. 
+
+* let's see an example. suppose we want to convert a Shape into a String. we have to use pattern matching to discover which constructor 
+  was used to construct the Shape. we can do this as follows:
+
+showShape :: Shape -> String
+showShape (Circle c r) =
+  "Circle [center: " <> showPoint c <> ", radius: " <> show r <> "]"
+showShape (Rectangle c w h) =
+  "Rectangle [center: " <> showPoint c <> ", width: " <> show w <> ", height: " <> show h <> "]"
+showShape (Line start end) =
+  "Line [start: " <> showPoint start <> ", end: " <> showPoint end <> "]"
+showShape (Text loc text) =
+  "Text [location: " <> showPoint loc <> ", text: " <> show text <> "]"
+
+showPoint :: Point -> String
+showPoint { x, y } =
+  "(" <> show x <> ", " <> show y <> ")"
+
+* each constructor can be used as a pattern, and the arguments to the constructor can themselves be bound using patterns of their own.
+* consider the first case of showShape: if the Shape matches the Circle constructor, then we bring the arguments of Circle (center and 
+  radius) into scope using two variable patterns, c and r. the other cases are similar. 
+
+Newtypes
+
+* there is a special case of algebraic data types, called newtypes. Newtypes are introduced using the newtype keyword 
+  instead of the data keyword. newtypes must define exactly one constructor, and that constructor must take exactly one 
+  argument. that is, a newtype gives a new name to an existing type. in fact, the values of a newtype have the same 
+  runtime representation as the underlying type, so there is no runtime performance overhead. they are, however distinct 
+  from the point of view of the type system. this gives an extra layer of type safety. 
+* as an example, we might want to define newtypes as type-level aliases for Number, to ascribe units like volts, amps and 
+  ohms: 
+
+newtype Volt = Volt Number 
+newtype Ohm = Ohm Number 
+newtype Amp = Amp Number 
+
+* then we define functions and values using these types:
+
+calculateCurrent :: Volt -> Ohm -> Amp
+calculateCurrent (Volt v) (Ohm r) = Amp (v / r)
+
+battery :: Volt
+battery = Volt 1.5
+
+lightbulb :: Ohm
+lightbulb = Ohm 500.0
+
+current :: Amp
+current = calculateCurrent battery lightbulb
+
+* this prevents us from making silly mistakes, such as attempting to calculate the current produced by two lightbulbs 
+  without a voltage source 
+
+current :: Amp
+current = calculateCurrent lightbulb lightbulb
+{-
+TypesDoNotUnify:
+  current = calculateCurrent lightbulb lightbulb
+                             ^^^^^^^^^
+  Could not match type
+    Ohm
+  with type
+    Volt
+-}
+
+* if we instead just used Number without newtype, then the compiler can't help us catch this mistake:
+
+-- This also compiles, but is not as type safe.
+calculateCurrent :: Number -> Number -> Number
+calculateCurrent v r = v / r
+
+battery :: Number
+battery = 1.5
+
+lightbulb :: Number
+lightbulb = 500.0
+
+current :: Number
+current = calculateCurrent lightbulb lightbulb -- uncaught mistake 
+
+* note that while a newtype can only have a single constructor, and the constructor must be of a single value, a 
+  newtype can take any number of type variables. for example, the following newtype would be a valid definition 
+  (err and a are the type variables, and the CouldError constructor expects a single value of type Either err a):
+
+newtype CouldError err a = CouldError (Either err a)
+
+* also, note that the constructor of a newtype often has the same name as the newtype itself, but this is not a requirement.
+  for example, unique names are also valid:
+
+newType Coulomb = MakeCoulomb Number 
+
+* in this case, Coulomb is the type constructor (of zero arguments), and MakeCoulomb is the data constructor. these 
+  constructors live in different namespaces, even when the names are identical, such as with the Volt example. this is 
+  true for all ADTs. note that although the type constructor and data constructor can have different names, in practice, 
+  it is idiomatic for them to share the same name. this is the case with Amp and Volt types above. 
+
+* another application of newtypes is to attach different behaviour to an existing type without changing its 
+  representation at runtime. we cover that use case in the next chapter when we discuss type classes. 
+
+A Library for Vector Graphics 
+
+* let's use the data types we have defined above to create a simple library 
+  for using vector graphics. 
+* define a type synonym for a Picture - just an array of Shape S:
+
+type Picture = Array Shape 
+
+* for debugging purposes, we'll want to be able to turn a Picture into something 
+  readable. The showPicture function lets us do that:
+
+showPicture :: Picture -> Array String
+showPicture = map showShape 
+
+Computing Bounding rectangles
+
+* the example code for this module contains a function bounds which computes 
+  the smallest bounding rectangle for a Picture 
+
+type Bounds = 
+  { top    :: Number
+  , left   :: Number
+  , bottom :: Number 
+  , right  :: Number
+  }
+
+* bounds uses the foldl function from Data.Foldable to traverse the array of 
+  Shapes in a Picture, and accumulate the smallest bounding rectangle 
+
+bounds :: Picture -> Bounds 
+bounds = foldl combine emptyBounds 
+  where 
+  combine :: Bounds -> Shape -> Bounds 
+  combine b shape = union (shapeBounds shape) b
+
+* in the base case, we need to find the smallest bounding rectangle of an 
+  empty Picture, and the empty bounding rectangle defined by emptyBounds 
+  suffices. 
+* the accumulating function combine is defined in a where block. combine takes 
+  a bounding rectangle computed from foldl's recursive call, and the next 
+  Shape in the array, and uses the union function to computte the union of the 
+  two bounding rectangles. the shapeBounds function computes the bounds of a 
+  single shape using pattern matching 
+
+
+CHAPTER 5
+
+* In this chapter, we will look at how recursive functions can be used to structure algorithms. Recursion is a basic technique used in functional programming, 
+  which we will use throughout this book. 
+* We will also cover some standard functions from PureScript's standard libraries. We will map, fold, and some useful special cases like filter and concatMap.
+* the motivating example for this chapter is a library of functions for working with a virtual filesystem. we will apply the techniques learned in this chapter 
+  to write functions that compute properties of the files represented by a model of a filesystem.
+
+Project Setup 
+
+* the source code for this chapter is contained in src/Data/Path.purs and test/Examples.purs. The Data.Path module contains a model of a virtual filesystem. you
+  do not need to modify the contents of this moduel. implement your solutions to the exercises in the Test.MySolutions module. Enable accompanying tests in the 
+  Test.Main module as you complete each exercise and check your work by running spago test.
+* the project has the following dependencies:
+* maybe, which defines the Maybe type constructor
+* arrays, which defines functions for working with arrays
+* strings, which defines functions for working with JavaScript strings
+* foldable-traversable, which defines functions for folding arrays and other data structures 
+* console, which defines functions for printing to the console
+
+Introduction 
+
+* recursion is an important technique in programming in general, but particularly common in pure functional programmming, because, as we will see in this chapter,
+  recursion helps to reduce the mutable state in our programs. 
+* recursion is closely linked to the divide and conquer strategy: to solve a problem on certain inputs, we can break down the inputs into smaller parts, solve 
+  the problem on those parts, and then assemble a solution from the partial solutions. 
+* let's see some simple examples of recursion in purescript.
+* here is the usual factorial function example: 
+
+factorial :: Int -> Int 
+factorial 0 = 1
+factorial n = n * factorial (n - 1)
+
+* here, we can see how the factorial function is computed by reducing the problem to a subproblem - computing the factorial of a smaller integer. when we reach 
+  zero, the answer is immediate. 
+* here is another common example that computes the fibonacci function:
+
+fib :: Int -> Int 
+fib 0 = 0
+fib 1 = 1
+fib n = fib (n - 1) + fib (n - 2)
+
+* again, this problem is solved by considering the solutions to subproblems. in this case, there are two subproblems, corresponding to the expressions 
+  fib (n - 1) and fib (n - 2). when these two subproblems are solved, we assemble the result by adding the partial results 
+
+Recursion on arrays 
+
+* we are not limited to defining recursive functions over the Int type! We will see recursive functions defined over a wide array of data types when we cover 
+  pattern matching later in the book, but for now, we will restrict ourselves to numbers and arrays. 
+* just as we branch based on whether the input is non-zero, in the array case, we will branch based on whether the input is non-empty. Consider this function , 
+  which computes the length of an array using recursion:
+
+import Prelude 
+import Data.Array (null, tail)
+import Data.Maybe (fromMaybe)
+
+length :: forall a. Array a -> Int
+length [] = 0
+length arr = 1 + (length $ fromMaybe [] $ tail arr)
+
+* in this function, we branch based on the emptiness of the array. the null function returns true on an empty array. empty arrays have a length of zero, and a 
+  non-empty array has a length that is one more than the length of its tail.
+* the tail function returns a Maybe wrapping the given array without its first element. if the array is empty (i.e it doesn't have a tail), Nothing is returned. 
+  the fromMaybe function takes a default value and a Maybe value. If the latter is Nothing it returns the default; in the other case, it returns the value wrapped 
+  by Just. 
+* this example is a very impractical way to find the length of an array in JavaScript, but it should provide enough help to allow you to complete the following 
+  exercises.
+
+Maps
+
+* the map function is an example of a recursive function on arrays. it is used to transform the elements of an array by applying a function to each element in 
+  turn. therefore, it changes the contents of the array but preserves its shape (ie its length)
+* when we cover type classes later in the book, we will see that the map function is an example of a more general pattern of shape-preserving functions which 
+  transform a class of type constructors called functors. 
+* let's try out the map function in PSCi:
+$ spago repl
+
+> import Prelude
+> map (\n -> n + 1) [1, 2, 3, 4, 5]
+[2, 3, 4, 5, 6]
+
+* notice how map is used - we provide a function that should be "mapped over" the array in the first argument, and the array itself in the second.
+
+Infix operators 
+
+* the map function can also be written between the mapping function and the array, by wrapping the function name in backticks:
+> (\n -> n + 1) `map` [1, 2, 3, 4, 5]
+[2, 3, 4, 5, 6]
+
+* this syntax is called infix function application, and any function can be made infix in this way. it is usually most appropriate for functions with two arguments
+* there is an operator which is equivalent to the map function when used with arrays, called <$>
+
+> (\n -> n + 1) <$> [1, 2, 3, 4, 5]
+[2, 3, 4, 5, 6]
+
+* let's look at the type of map:
+> :type map
+forall (f :: Type -> Type) (a :: Type) (b :: Type). Functor f => (a -> b) -> f a -> f b
+
+* the type of map is actually more general than we need in this chapter. for our purposes, we can treat map as if it had the following less general type:
+forall (a :: Type) (b :: Type). (a -> b) -> Array a -> Array b
+
+* this type says that we can choose any two types, a and b, with which to apply the map function. a is the type of elements in the source array, and b is the 
+  type of elements in the target array. in particular, there is no reason why map has to preserve the type of the array elements. we can use map or <$> to 
+  transform integers to strings for example. 
+
+> show <$> [1, 2, 3, 4, 5]
+
+["1","2","3","4","5"]
+
+* even though the infix operator <$> looks like special syntax, it is in fact just an alias for a regular PureScript function. The function is simply applied using 
+  infix syntax. In fact, the function can be used like a regular function by enclosing its name in parentheses. this means we can use the parenthesized name (<$>)
+  in place of map on arrays. 
+
+> (<$>) show [1, 2, 3, 4, 5]
+["1","2","3","4","5"]
+
+* infix function names are defined as aliases for existing function names. for example, the Data.Array module defines an infix operator (...) as a synonym for 
+  the range function, as follows:
+
+  infix 8 range as ...
+* we can use this operator as follows: 
+
+> import Data.Array
+
+> 1 .. 5
+[1, 2, 3, 4, 5]
+
+> show <$> (1 .. 5)
+["1","2","3","4","5"]
+
+
+* note: infix operators can be a great tool for defining domain-specific languages with a natural syntax. however, used excessively, they can render code 
+  unreadable to beginners, so it is wise to exercise caution when defining any new operators.
+* in the example above, we parenthesized the expression 1..5, but this was actually not necessary, because the Data.Array module assigns a higher precedence to 
+  the .. operator than to the <$> operator. in the example above, the precedence of the .. operator was defined as 8, the number after the infix keyword.
+  this is higher than the precedence level of <$>, meaning that we do not need to add parentheses:
+
+  > show <$> 1 .. 5
+["1","2","3","4","5"]
+
+* if we wanted to assign an associativity (left or right) to an infix operator, we could do so with the infixl and infixr keywords instead. using infix assigns 
+  no associativity, meaning that you must parenthesize any expression using the same operator multiple times or using multiple operators of the same precedence.
+
+Filtering arrays 
+
+* the Data.Array module provides another function filter, which is commonly used together with map. It provides the ability to create a new array from an exisiting 
+ array, keeping only those elements which match a predicate function. for example, suppose we wanted to compute an array of all numbers between 1 and 10 which 
+ were even. we could do so as follows:
+
+ > import Data.Array
+
+> filter (\n -> n `mod` 2 == 0) (1 .. 10)
+[2,4,6,8,10]
+
+Flattening Arrays 
+
+* another standard function on arrays is the concat function, defined in Data.Array. concat flattens an array of arrays into a single array:
+
+> import Data.Array
+
+> :type concat
+forall (a :: Type). Array (Array a) -> Array a
+
+> concat [[1, 2, 3], [4, 5], [6]]
+[1, 2, 3, 4, 5, 6]
+
+* there is a related function called concatMap which is a combination of the concat and map functions. where map takes a function from values to values (possibly 
+  of a different type), concatMap takes a function from values to arrays of values. let's see it in action: 
+
+  > import Data.Array
+
+> :type concatMap
+forall (a :: Type) (b :: Type). (a -> Array b) -> Array a -> Array b
+
+> concatMap (\n -> [n, n * n]) (1 .. 5)
+[1,1,2,4,3,9,4,16,5,25]
+
+* here, we call concatMap with the function \n -> [n, n * n] which sends an integer to the array of two elements consisting of that integer and its square. the 
+  result is an array of ten integers: the integers from 1 to 5 along with their squares. 
+* note how concatMap concatenates its results. it calls the provided function once for each element of the original array, generating an array for each. finally, 
+  it collapses all of those arrays into a single array, which is its result.
+
+* map, filter and concatMap form the basis for a whole range of functions over arrays called "array comprehensions"
+
+Array comprehensions
+
+* suppose we wanted to find the factors of a number n. one simple way to do this would be by brute force: we could generate all pairs of numbers between 1 and n, 
+  and try multiplying them together. if the product was n, we would have found a pair of factors of n. 
+* we can perform this computation using array comprehension. we will do so in steps, using PSCi as our interactive deployment environment. 
+* the first step is to generate an array of pairs of numbers below n, which we can do using concatMap.
+* let's start by mapping each number to the array 1 .. n :
+
+> pairs n = concatMap (\i -> 1 .. n)(1 .. n)
+
+* we can test our function
+
+> pairs 3
+[1,2,3,1,2,3,1,2,3]
+
+* this is not quite what we want. instead of just returning the second element of each pair, we need to map a function over the inner copy of 1 .. n which will 
+  allow us to keep the entire pair:
+
+  > :paste
+… pairs' n =
+…   concatMap (\i ->
+…     map (\j -> [i, j]) (1 .. n)
+…   ) (1 .. n)
+… ^D
+
+> pairs' 3
+[[1,1],[1,2],[1,3],[2,1],[2,2],[2,3],[3,1],[3,2],[3,3]]
+
+> :paste
+… pairs' n =
+…   concatMap (\i ->
+…     map (\j -> [i, j]) (1 .. n)
+…   ) (1 .. n)
+… ^D
+
+> pairs' 3
+[[1,1],[1,2],[1,3],[2,1],[2,2],[2,3],[3,1],[3,2],[3,3]]
+
+* this is looking better. however we are generating too many pairs: we keep both [1, 2] and [2, 1] for example. we can exclude the second case by making sure that
+  j only ranges from i to n 
+
+> :paste
+… pairs'' n =
+…   concatMap (\i ->
+…     map (\j -> [i, j]) (i .. n)
+…   ) (1 .. n)
+… ^D
+> pairs'' 3
+[[1,1],[1,2],[1,3],[2,2],[2,3],[3,3]]
+
+* great! now that we have all the pairs of potential factors, we can use filter to choose the pairs which multiply to give n:
+
+> import Data.Foldable
+
+> factors n = filter (\pair -> product pair == n) (pairs'' n)
+
+> factors 10
+[[1,10],[2,5]]
+
+* this code uses the product function from the Data.Foldable module in the foldable-traversable library
+
+Do Notation 
+
+* However, we can improve the readability of our code considerably. map and concatMap are so fundamental, that they (or rather their generalizations map and bind)
+  form the basis of a special syntax called do notation. 
+
+* note: just like map and concatMap allowed us to write array comprehensions, the more general operators map and bind allow us to write so-called monad 
+  comprehensions. we'll see plenty more examples of monads later in the book, but in this chapter we will only consider arrays. 
+* we can rewrite our factors function using do notation as follows:
+
+factors :: Int -> Array (Array Int)
+factors n = filter (\xs -> product xs == n) do
+  i <- 1 .. n
+  j <- i .. n
+  pure [ i, j ]
+
+* the keyword do introduces a block of code that uses do notation. the block consists of expressions of a few types:
+* expressions that bind elements of an array to a name. these are indicated with the backwards facing arrow <- , with a name on the left, and an expression on
+  the right whose type is an array. 
+* expressions that do not bind elements of the array to names. the do result is an example of this kind of expression and is illustrated in the last line, pure 
+  [i, j]
+* expresions that give names to expressions, using the let keyword 
+
+* the new notation hopefully makes the structure of the algorithm clearer. if you mentally replace the arrow <- with the word "choose", you might read it as 
+  follows: "choose an element i between 1 and n, then choose an element j between i and n, and return [i, j].
+* in the last line, we use the pure function. this function can be evaluated in PSCi, but we have to provide a type: 
+> pure [1, 2] :: Array (Array Int)
+[[1, 2]]
+
+* in the case of arrays, pure simply constructs a singleton array. we can modify our factors function to use this form, instead of using pure: 
+factorsV2 :: Int -> Array (Array Int)
+factorsV2 n = filter (\xs -> product xs == n) do
+  i <- 1 .. n
+  j <- i .. n
+  [ [ i, j ] ]
+* and the result would be the same 
+
+Guards
+
+* one further change we can make to the factors function is to move the filter inside the array comprehension. this is possible using the guard function from the 
+  Control.Alternative module (from the control package):
+
+import Control.Alternative (guard)
+
+factorsV3 :: Int -> Array (Array Int)
+factorsV3 n = do
+  i <- 1 .. n 
+  j <- i .. n
+  guard $ i * j == n 
+  pure [i, j]
+
+* just like pure, we can apply the guard function in PSCi to understand how it works. the type of the guard function is more general than we need here:
+> import Control.Alternative 
+> :type guard
+forall (m :: Type -> Type). Alternative m => Boolean -> m Unit
+
+* the Unit type represents values with no computational content - the absence of a concrete meaningful value.
+* we often use Unit "wrapped" in a type constructor as the return type of a computation where we only care about the effects of the computation (or a "shape" 
+  of the result) and not some concrete value. 
+* for example, the main function has the type Effect Unit. Main is an entry point to the project - we don't call it directly.
+* we'll explain what m in the type signature means in Chapter 6
+
+* in our case, we can assume tht PSCi reported the following type:
+Boolean -> Array Unit 
+
+* for our purposes, the following calculations tell us everything we need to know about the guard function on arrays:
+
+> import Data.Array
+
+> length $ guard true
+1
+
+> length $ guard false
+0
+
+* if we pass an expression to guard that evaluates to true, then it returns an array with a single element. if the expression evaluates to false, then its result 
+  is empty. 
+* this means that if the guard fails, then the current branch of the array comprehension will terminate early with no results. this means that a call to guard is 
+  equivalent to using filter on the intermediate array. depending on the application, you might prefer to use guard instead of filter. try the two defintions of 
+  factors to verify that they give the same results 
+  
+  Folds
+
+* Left and right folds over arrays provide another class of intersecting functions that can be implemented using recursion.
+* start by importing the Data.Foldable module and inspecting the types of the foldl and foldr functions using PSCi:
+
+> import Data.Foldable
+
+> :type foldl
+forall (f :: Type -> Type) (a :: Type) (b :: Type). Foldable f => (b -> a -> b) -> b -> f a -> b
+
+> :type foldr
+forall (f :: Type -> Type) (a :: Type) (b :: Type). Foldable f => (a -> b -> b) -> b -> f a -> b
+
+* these types are more general than we are interested in right now. For this chapter, we can simplify and assume the following (more specific) type signature:
+
+-- foldl
+forall a b. (b -> a -> b) -> b -> Array a -> b
+
+-- foldr
+forall a b. (a -> b -> b) -> b -> Array a -> b
+
+* In both cases, the type a corresponds to the type of elements of our array. The type b can be thought of as the type of an "accumulator", which will accumulate a result as we traverse the array.
+* the difference between the foldl and foldr functions is the direction of the traversal. foldl folds the array "from the left", whereas foldr folds the array "from the right".
+* let's see these functions in action. let's use foldl to sum an array of integers. the type a will be Int, and we can also choose the result type b to be Int. We need to provide three arguments: a function Int -> Int -> Int, 
+  which will add the next element to the accumulator, an initial value for the accumulator of type Int, and an array of Int s to add. for the first argument, we can use the addition operator, and the initial value of the 
+  accumulator will be zero: 
+
+> foldl (+) 0 (1 .. 5)
+15
+
+* Let's write an example where the choice of folding function matters to illustrate the difference. Instead of the addition function, let's use string concatenation to build a string: 
+
+> foldl (\acc n -> acc <> show n) "" [1,2,3,4,5]
+"12345"
+
+> foldr (\n acc -> acc <> show n) "" [1,2,3,4,5]
+"54321"
+
+* this illustreates the difference between the two functions. the left fold expression is equivalent to the following application:
+((((("" <> show 1) <> show 2) <> show 3) <> show 4) <> show 5)
+
+* whereas the right fold is equivalent to this:
+((((("" <> show 5) <> show 4) <> show 3) <> show 2) <> show 1)
+
+Tail Recursion
+
+* recursion is a powerful technique for specifying algorithms but comes with a problem: evaluating recursive functions in JavaScript can lead to stack overflow errors if our inputs are too large.
+* it is easy to verify this problem with the following code in PSCi:
+
+ :paste
+… f n =
+…   if n == 0
+…     then 0
+…     else 1 + f (n - 1)
+… ^D
+
+> f 10
+10
+
+> f 100000
+RangeError: Maximum call stack size exceeded
+
+* this is a problem. if we adopt recursion as a standard technique from functional programming, we need a way to deal with possibly unbounded recursion
+* purescript provides a partial solution to this problem through tail recursion optimization 
+
+* note: more complete solutions to the problem can be implemented in libraries using so-called trampolining, but that is beyond the scope of this chapter. the interested reader can consult the documentation for the free and 
+  tailrec packages 
+* the key observation that enables tail recursion optimization: a recursive call in tail position to a function can be replaced with a jump, which does not allocate a stack frame. a call is in tail position when it is the last 
+  call made before a function returns. this is why we observed a stack overflow in the example - the recursive call to f was not in tail position.
+* in practice, the PureScript compiler does not replace the recursive call with a jump, but rather replaces the entire recursive function with a while loop.
+* here is an example of a recursive function with all recursive calls in tail position:
+
+factorialTailRec :: Int -> Int -> Int
+factorialTailRec 0 acc = acc
+factorialTailRec n acc = factorialTailRec (n - 1) (acc * n)
+
+* notice tht the recursive call to factorialTailRec is the last thing in this function - it is in tail position.
+
+Accumulators 
+
+* one common way to turn a not tail recursive function into a tail recursive is to use an accumulator parameter. An accumulator parameter is an additional 
+  parameter added to a function that accumulates a return value, as opposed to using the return value to accumulate the result. 
+* for example, consider the length function presented at the beginning of the chapter:
+
+length :: forall a. Array a -> Int
+length [] = 0
+length arr = 1 + (length $ fromMaybe [] $ tail arr)
+
+* this implementation is not tail recursive, so the generated JavaScript will cause a stack overflow when executed on a large input array. However, we can make it 
+  tail recursive, by introducing a second function argument to accumulate the result instead. 
+
+lengthTailRec :: forall a. Array a -> Int
+lengthTailRec arr = length' arr 0
+  where
+  length' :: Array a -> Int -> Int
+  length' [] acc = acc
+  length' arr' acc = length' (fromMaybe [] $ tail arr') (acc + 1)
+
+* in this case, we delegate to the helper function length' , which is tail recursive - its only recursive call is in the last case, in tail position. this means 
+  that the generated code will be a while loop and not blow the stack for large inputs. 
+* to understand the implementation of lengthTailRec, note that the helper function length' essentially uses the accumulator parameter to maintain an additional 
+  piece of state - the partial result. it starts at 0 and grows by adding 1 for every element in the input array.
+* note also that while we might think of the accumulator as "state" there is no direct mutation. 
+
+Prefer folds to Explicit Recursion 
+
+* if we can write our recursive functions using tail recursion, we can benefit from 
+  tail recursion optimization, so it becomes tempting to try and write all of our 
+  functions in this form. However, it is often easy to forget that many unctions can 
+  be written directly as a fold over an array or similar data structure. Writing 
+  algorithms directly in terms of combinators such as map and fold has the added 
+  advantage of code simplicity - these combinators are well-understood, and as such 
+  communicate the intent of the algorithm much better than explicit recursion. 
+* for example, we can reverse an array using foldr:
+
+> import Data.Foldable
+
+> :paste
+… reverse :: forall a. Array a -> Array a
+… reverse = foldr (\x xs -> xs <> [x]) []
+… ^D
+
+> reverse [1, 2, 3]
+[3,2,1]
+
+* writing reverse in terms of foldl will be left as an exercise for the reader.
+
+A virtual filesystem 
+
+* in this section, we'll apply what we've learned, writing functions that will work with a model of a filesystem. we will use maps, folds, and filters to work 
+  with a predefined API. 
+* The Data.Path module defines an API for a virtual filesystem as follows:
+* there is a type Path which represents a path in the filesystem
+* there is a path root which represents the root directory
+* the ls function enumerates the files in a directory
+* the filename function returns the file name for a path 
+* the size function returns the file size for a Path representing a file 
+* the isDirectory function tests whether a Path is a file or directory
+
+* in terms of types, we have the following type definitions:
+root :: Path 
+ls :: Path -> Array Path 
+filename :: Path -> String 
+size :: Path -> Maybe Int 
+isDirectory :: Path -> Boolean 
+
+we can try out the API in PSCi:
+
+$ spago repl
+
+> import Data.Path
+
+> root
+/
+
+> isDirectory root
+true
+
+> ls root
+[/bin/,/etc/,/home/]
+
+* the Test.Examples module defines functions that use the Data.Path API. you do not need to modify the Data.Path module, or understand its implementation. we 
+  will work entirely in the Test.Examples module.
+
+Listing all files 
+
+* let's write a function that performs a deep enumeration of all files inside a directory. this function will have the following type:
+allFiles :: Path -> Array Path 
+
+* we can define this function by recursion. first we can use ls to enumerate the immediate children of the directory. for each child, we can recursively apply 
+  allFiles, which will return an array of paths. concatMap will allow us to apply allFiles and flatten the results simultaneously. 
+* finally, we use the cons operator : to include the current file:
+allFiles file = file : concatMap allFiles (ls file)
+
+* note: the cons operator : has poor performance on immutable arrays, so it is not generally recommended. performance can be improved by using other data structures,
+  such as linked lists and sequences. 
+* let's try this function in PSCi:
+
+> import Test.Examples
+> import Data.Path
+
+> allFiles root
+
+[/,/bin/,/bin/cp,/bin/ls,/bin/mv,/etc/,/etc/hosts, ...]
+
+* great! now let's see if we can write this function using an array comprehension using do notation. 
+* recall that a backwards arrow corresponds to choosing an element from an array. the first step is to choose an element from the immediate children of the 
+  argument. then we call the function, recursively for that file. since we use do notation, there is an implicit call to concatMap, which concatenates all of the 
+  recursive results.
+* here is the new version:
+
+allFiles' :: Path -> Array Path
+allFiles' file = file : do
+  child <- ls file
+  allFiles' child
+
+* try out the new version in PSCi - you should get the same result. I'll let you decide which version you find clearer 
+
+Conclusion
+
+* in this chapter, we covered the basics of recursion in PureScript to express algorithms concisely. we also introduced user-defined infix operators, standard 
+  functions on arrays such as maps, filters and folds, and array comprehensions that combine these ideas. finally, we showed the importance of using tail recursion
+  to avoid stack overflow errors and how to use accumulator parameters to convert functions to tail recursive form. 
