@@ -106,5 +106,5 @@ Now we'll see hoe map and apply can be used together to lift functions of an arb
 
 For functions of one argument, we can use map directly. 
 
-For functions of two arguments, we have a curried function g with type a -> b -> c, say. This is equivalent to the type a -> (b -> c), so we can apply map to g to get a new function of type f a -> f (b -> c) for any type constructor f with a Functor instance. 
+For functions of two arguments, we have a curried function g with type a -> b -> c, say. This is equivalent to the type a -> (b -> c), so we can apply map to g to get a new function of type f a -> f (b -> c) for any type constructor f with a Functor instance. Partially applying this function to the first lifted argument (of type fa), we get a new wrapped function of type f (b -> c)
 
