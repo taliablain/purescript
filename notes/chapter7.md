@@ -292,7 +292,190 @@ To write this function, we'll consider the length of the list of arguments. If t
 
 In fact, this is the only thing we can do!
 
-If the list is non-empty, then we have a head element, which is a wrapped argument of type f a, and a tail of type List (f a). We can recursively combine the effects in the tail, giving a result of type f (List a). We can then use <$> and <*> to lidt the Cons constructor over the head and new tail:
+If the list is non-empty, then we have a head element, which is a wrapped argument of type f a, and a tail of type List (f a). We can recursively combine the effects in the tail, giving a result of type f (List a). We can then use <$> and <*> to lift the Cons constructor over the head and new tail:
 
-    combineList (Cons x xs) =
+    combineList (Cons x xs) = Cons <$> x <*> combineList xs
 
+Again, this was the only sensible implementation, based on the types we were given.
+
+We can test this function in PSCi, using the Maybe type constructor as an example:
+
+    > import Data.List
+    > import Data.Maybe
+
+    > combineList (fromFoldable [Just 1, Just 2, Just 3])
+    (Just (Cons 1 (Cons 2 (Cons 3 Nil))))
+
+When specialized to Maybe, our function returns a Just only if every list element is Just; otherwise, it returns Nothing. This is consistent with our intuition of working in a larger language supporting optional values - a list of computations that produce optional results only has a result itself if every computation contained a result. 
+
+But the combineList function works for any Applicative! we can use it to combine computations that possibly signal an error using Either err, or which read from a global configuration using r ->.
+
+We will see the combineList function again when we consider Traversable functors. 
+
+# Applicative Validation
+
+The source code for this chapter defines several data types which might be used in an address book application. The details are omitted here, but the key functions exported by the Data.AddressBook module have the following types:
+
+    address :: String -> String -> String -> Address
+    phoneNumber :: PhoneType -> String -> PhoneNumber 
+    person :: String -> String -> Address -> Array PhoneNumber -> Person 
+
+Where PhoneType is defined as an algebraic data type: 
+
+    data PhoneType
+      = HomePhone
+      | WorkPhone
+      | CellPhone
+      | OtherPhone
+
+These functions can construct a Person representing an address book entry. For example, the following value is defined in Data.AddressBook:
+
+    examplePerson :: Person
+    examplePerson =
+      person "John" "Smith"
+        (address "123 Fake St." "FakeTown" "CA")
+        [ phoneNumber HomePhone "555-555-5555"
+        , phoneNumber CellPhone "555-555-0000"
+        ]
+
+Test this value in PSCi (this result has been formatted):
+
+    > import Data.AddressBook
+
+    > examplePerson
+    { firstName: "John"
+    , lastName: "Smith"
+    , homeAddress: 
+        { street: "123 Fake Sy."
+        , city: "FakeTown"
+        , state: "CA"
+        }
+    , phones:
+        [ { type: HomePhone
+          , number: "555-555-5555"
+          }
+        , { type: CellPhone
+          , number: "555-555-0000"
+          }
+        ]
+    }
+
+We saw in a previous section how we could use the Either String functor to validate a data structure of type Person. For example, provided functions to validate the two names in the structure, we might validate the entire data structure as follows:
+
+    nonEmpty1 :: String -> Either String String
+    nonEmpty1 ""     = Left "Field cannot be empty"
+    nonEmpty1 value  = Right value 
+
+    validatePerson1 :: Person -> Either String Person
+    validatePerson1 p =
+      person <$> nonEmpty1 p.firstName 
+             <*> nonEmpty1 p.lastName
+             <*> pure p.homeAddress
+             <*> pure p.phones
+
+or with applicative do:
+
+    validatePerson1Ado :: Person -> Either String Person
+    validatePerson1Ado p = ado
+        f <- nonEmpty1 p.firstName
+        l <- nonEmpty1 p.lastName
+        in person f l p.homeAddress p.phones 
+
+In the first two lines, we use the nonEmpty1 function to validate a non-empty string. nonEmpty1 returns an error indicated with the Left constructor if its input is empty. Otherwise, it returns the value wrapped with the Right constructor.
+
+The final lines do not perform any validation but simply provide the address and phones fields to the person function as the remaining arguments. 
+
+This function can be seen to work in PSCi, but it has a limitation that we have seen before:
+
+    > validatePerson $ person "" "" (address "" "" "") []
+    (Left "Field cannot be empty")
+
+The Either String applicative functor only provides the first error encountered. Given the input here, we would prefer to see two errors - one for the missing first name and a second for the missing last name. 
+
+There is another applicative functor that the validation library provides. This functor is called V, and it can return errors in any semigroup. For example, we can use V (Array String) to return an array of Strings as errors, concatenating new errors onto the end of the array. 
+
+The Data.AddressBook.Validation module uses the V (Array String) applicative functor to validate the data structures in the Data.AddressBook module. 
+
+Here us ab example of a validator taken from the Data.AddressBook.Validation module:
+
+    type Errors
+      = Array String
+    
+    nonEmpty :: String -> String -> V Errors String 
+    nonEmpty field ""     = invalid [ "Field '" <> field <> "' cannot be empty" ]
+    nonEmpty _     value  = pure value 
+
+    lengthIs :: String -> Int -> String -> V Errors String 
+    lengthIs field len value | length value /= len =
+      invalid ["Field '" <> field <> "' must have length " <> show len ]
+    lengthIs _    _   value = pure value 
+
+    validateAddress :: Address -> V Errors Address 
+    validateAddress a = 
+      address <$> nonEmpty "Street"  a.street
+              <*> nonEmpty "City"    a.city
+              <*> lengthIs "State" 2 a.state
+
+or with applicative do:
+
+    validateAddressAdo :: Address -> V Errors Address 
+    validateAddressAdo a = ado
+      street <- nonEmpty "Street"  a.street
+      city   <- nonEmpty "City"    a.city
+      state  <- lengthIs "State" 2 a.state
+        in address street city state 
+
+validateAddress validates an Address structure. It checks that the street and city fields are non-empty and that the string in the state field has length 2. 
+
+Notice how the nonEmpty and lengthIs validator functions both use the invalid function provided by the Data.Validation module to indicate an error. Since we are working in the Array String semigroup, invalid takes an array of strings as its argument. 
+
+We can try this function in PSCi:
+
+    > import Data.AddressBook
+    > import Data.AddressBook.Validation 
+
+    > validateAddress $ address "" "" ""
+    (invalid [ "Field 'Street' cannot be empty"
+             , "Field 'City' cannot be empty"
+             , "Field 'State' must have length 2"
+             ])
+    > validateAddress $ address "" "" "CA"
+    (invalid [ "Field 'Street' cannot be empty"
+             , "Field 'City' cannot be empty"
+             ])
+
+This time, we receive an array of all validation errors. 
+
+# Regular Expression Validators 
+
+The validatePhoneNumber function uses a regular expression to validate the form of its argument. The key is a matches validation function, which uses a Regex from the Data.String.Regex module to validate its input:
+
+   matches :: String -> Regex -> String -> V Errors String 
+   matches _     regex value | test regex value 
+                         = pure value 
+   matches field _     _     = invalid [ "Field '" <> field <> "' did not match the required format" ]
+
+Again, notice how pure is used to indicate successful validation, and invalid is used to signal an array of errors. 
+
+validatePhoneNumber is built from the matches function in the same way as before:
+
+    validatePhoneNumber :: PhoneNumber -> V Errors PhoneNumber
+    validatePhoneNumber pn = 
+      phoneNumber <$> pure pn."type"
+                  <*> matches "Number" phoneNumberRegex pn.number 
+
+or with applicative do:
+
+    validatePhoneNumberAdo :: PhoneNumber -> V Errors PhoneNumber 
+    validatePhoneNumberAdo pn = ado
+      tpe    <- pure pn."type"
+      number <- matches "Number" phoneNumberRegex pn.number 
+      in phoneNumber tpe number 
+
+Again, try running this validator against some valid and invalid inputs in PSCi:
+
+    > validatePhoneNumber $ phoneNumber HomePhone "555-555-5555"
+    pure ({ type: HomePhone, number: "555-555-5555" })
+
+    > validatePhoneNumber $ phoneNumber HomePhone "555.555.5555"
+    invalid (["Field 'Number' did not match the required format"])
