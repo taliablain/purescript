@@ -479,3 +479,124 @@ Again, try running this validator against some valid and invalid inputs in PSCi:
 
     > validatePhoneNumber $ phoneNumber HomePhone "555.555.5555"
     invalid (["Field 'Number' did not match the required format"])
+
+# Traversable Functors 
+
+The remaining validator is validatePerson, which combines the validators we have seen so far to validate an entire Person structure, including the following new validatePhoneNumbers function:
+    validatePhoneNumbers :: String -> Array PhoneNumber -> V Errors (Array PhoneNumber)
+    validatePhoneNumbers field []       =        
+      invalid ["Field '" <> field <> "' must contain at least one value" ]
+    validatePhoneNumbers _    phones  =
+      traverse validatePhoneNumber phones
+
+    validatePerson :: Person -> V Errors Person 
+    validatePerson p = 
+      person <$> nonEmpty "First Name" p.firstName
+             <*> nonEmpty "Last Name" p.lastName
+             <*> validateAddress p.homeAddress
+             <*> validatePhoneNumbers "Phone Numbers" p.phones 
+
+or with applicative do
+
+  validatePersonAdo :: Person -> V Errors Person
+  validatePersonAdo p = ado
+    firstName <- nonEmpty "First Name" p.firstName
+    lastName  <- nonEmpty "Last Name" p.lastName
+    address   <- validateAddress p.homeAddress
+    numbers   <- validatePhoneNumbers "Phone Numbers" p.phones
+    in person firstName lastName address numbers 
+
+validatePhoneNumbers uses a new function we haven't seen before - traverse. 
+
+traverse is defined in the Data.Traversable module, in the Traversable type class:
+
+  class (Functor t, Foldable t) <= Traversable t where 
+    traverse :: forall a b m. Applicative m => (a -> m b) -> t a -> m (t b)
+    sequence :: forall a m. Applicative m => t (m a) -> m (t a)
+    
+Traversable defines the class of traversable functors. The types of its functions might look a little intimidating, but validatePerson provides a good motivating example.
+
+Every traversable functor is both a Functor and foldable (recall that a foldable functor was a type constructor that supported a fold operation, reducing a structure to a single value). In addition, a traversable functor can combine a collection of side-effects that depend on its structure. 
+
+This may sound complicated, but let's simplify things by specializing to the case of arrays. The array type constructor is traversable, which means that there is a function:
+
+  traverse :: forall a b m. Applicative m => (a -> m b) -> Array a -> m (Array b)
+
+Intuitively, given any applicative functor m, and a function which takes a value of type a and returns a value of type b (with side-effects tracked by m), we can apply the function to each element of type Array a to obtain a result of type Array b (with side-effects tracked by m).
+
+Still not clear? Let's specialize further to the case where m is the V Errors applicative functor above. Now we have a function of type
+
+  traverse :: forall a b. (a -> V Errors b) -> Array a -> V Errors (Array b)
+
+This type signature says that if we have a validation function m for type a, then traverse m is a validation function for arrays of type Array a. But that's exactly what we need to be able to validate the phones field of the Person data structure! We pass validatePhoneNumber to traverse to create a validation function that validates each element successively. 
+
+In general, traverse walks over the elements of a data strucutre, performing computations with side-effects and accumulating a result. 
+
+The type signature for Traversable's other function sequence might look more familiar:
+
+  sequence :: forall a m. Applicative m => t (m a) -> m (t a)
+
+In fact, the combineList function that we wrote earlier is just a special case of the sequence function from the Traversable type class. Setting t to be the type constructor List, we recover the type of the combineList function:
+
+  combineList :: forall f a. Applicative f => List (f a) -> f (List a)
+
+Traversable functors capture the idea of traversing a data structure, collecting a set of effectful computations, and combining their effects. In fact, sequence and traverse are equally important to the definition of Traversable - each can be implemented in terms of the other. This is left as an exercise for the interested reader.
+
+The Traversable instance for lists given in the Data.List module is:
+
+  instance Traversable List where 
+  -- traverse :: forall a b m. Applicative m => (a -> m b) -> List a  -> m (List b)
+  traverse _ Nil          = pure Nil
+  traverse f (Cons x xs)  = Cons <$> f x <*> traverse f xs
+
+In the case of an empty list, we can return an empty list using pure. If the list is non-empty, we can use the function f to create a computation of type f b from the head element. We can also call traverse recursively on the tail. Finally, we can lift the Cons constructor over the applicative functor m to combine the two results. 
+
+But there are more examples of traversable functors than just arrays and lists. The Maybe type constructor we saw earlier also has an instance for Traversable. We can try it in PSCi:
+
+  > import Data.Maybe 
+  > import Data.Traversable
+  > import Data.AddressBook.Validation
+
+  > traverse (nonEmpty "Example") Nothing 
+  pure (Nothing)
+
+  > traverse (nonEmpty "Example") (Just "")
+  invalid (["Field 'Example' cannot be empty"])
+
+  > traverse (nonEmpty "Example") (Just "Testing")
+  pure ((Just "Testing"))
+      
+These examples show that traversing the Nothing value returns Nothing with no validation, and traversing Just x uses the validation function to validate x. That is, traverse takes a validation function for type a and returns a validation function for Maybe a, ie., a validation function for optional values of type a. 
+
+Other traversable functors include Array, Tuple a, and Either a for any type a. Generally, most "container" data type constructors have Traversable instances. As an example, the exercises will include writing a Traversable instance for a type of binary trees.
+
+# Applicative Functors for Parallelism 
+
+In the discussion above, I chose the word "combine" to describe how applicative functors "combine side-effects". However, in all the examples given, it would be equally valid to say that applicative functors allow us to "sequence" effects. This would be consistent with the intuition that traversable functors provide a sequence function to combine effects in sequence based on a data structure. 
+
+However, in general, applicative functors are more general than this. The applicative functor laws do not impose any ordering on the side-effects that their computations perform. It would be valid for an applicative functor to perform its side-effects in parallel.
+
+For example, the V validation functor returned an array of errors, but it would work just as well if we picked the Set semigroup, in which case it would not matter what order we ran the various validators. We could even run them in parallel over the data structure! 
+
+As a second example, the parallel package provides a type class Parallel which supports parallel computations. Parallel provides a function parallel that uses some Applicative functor to compute the result of its input computation in parallel:
+
+  f <$> parallel computation1
+    <*> parallel computation2
+  
+This computation would start computing values asynchronously using computation1 and computation2. When both results have been computed, they would be combined into a single result using the function f. 
+
+We will see this idea in more detail when we apply applicative functors to the problem of callback hell later in the book.
+
+Applicative functors are a natural way to capture side-effects that can be combined in parallel.
+
+# Conclusion 
+
+In this chapter, we covered a lot of new ideas:
+
+* We introduced the concept of an applicative functor which generalizes the idea of function application to type constructors that capture some notion of side-effect
+* We saw how applicative functors solved the problem of validating data structures and how by switching the applicative functor, we could change from reporting a single error to reporting all errors across a data structure 
+* We met the Traversable type class, which encapsulates the idea of a traversable functor, or a container whose elements can be used to combine values with side-effcts 
+
+Applicative functors are an interesting abstraction that provides neat solutions to a number of problems. We will see them a few more times throughout the book. In this case, the validation applicative functor provided a way to write validators in a declarative style, allowing us to define what our validators should validate and not how they should perform that validation. In general, we will see that applicative functors are a useful tool for the design of domain specific languages. 
+
+In the next chapter, we will see a related idea, the class of monads, and extend our address book example to run in the browser! 
